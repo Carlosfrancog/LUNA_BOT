@@ -278,7 +278,7 @@ async def clear(ctx, amount=100):
 
 
 
-def new_wallet(member_id):
+def new_wallet(member_id, member_name):
     if not os.path.exists(wallet_file):
         with open(wallet_file, 'w') as f:
             json.dump({}, f)
@@ -288,11 +288,12 @@ def new_wallet(member_id):
         if member_id in wallets:
             return 'Você já possui uma carteira registrada!'
         else:
-            wallets[member_id] = {"balance": 0, "transactions": []}
+            wallets[member_id] = {"user_name": member_name, "balance": 0, "transactions": []}
             f.seek(0)
             json.dump(wallets, f, indent=4)
             f.truncate()
             return 'Sua carteira foi criada com sucesso!'
+
 
 async def show_balance(ctx, member_id):
     with open(wallet_file, 'r') as f:
@@ -309,8 +310,10 @@ async def show_balance(ctx, member_id):
 @client.command()
 async def newwallet(ctx):
     member_id = str(ctx.author.id)
-    message = new_wallet(member_id)
+    member_name = ctx.author.name
+    message = new_wallet(member_id, member_name)
     await ctx.send(message)
+
     
 @client.command()
 async def wallet(ctx):
@@ -327,6 +330,7 @@ async def wallet(ctx):
 async def addcoins(ctx, amount: int):
     member_id = str(ctx.author.id)
     with open(wallet_file, 'r') as f:
+        json.dump({}, f)
         wallets = json.load(f)
 
     if member_id not in wallets:
@@ -339,6 +343,69 @@ async def addcoins(ctx, amount: int):
         json.dump(wallets, f)
 
     await ctx.send(f'Foram adicionadas {amount} coins à sua carteira.')
+
+
+@client.command()
+async def removecoins(ctx, amount: int):
+    member_id = str(ctx.author.id)
+    with open(wallet_file, 'r') as f:
+        json.dump({}, f)
+        wallets = json.load(f)
+
+    if member_id not in wallets:
+        await ctx.send('Você ainda não possui carteira registrada. Use o comando +newwallet para criar uma.')
+        return
+
+    if amount >= wallets[member_id]['balance'] :
+        wallets[member_id]['balance'] -= wallets[member_id]['balance'] 
+    else:
+        wallets[member_id]['balance'] -= amount
+
+    with open(wallet_file, 'w') as f:
+        json.dump(wallets, f)
+
+    if wallets[member_id]['balance'] == 0:
+        await ctx.send(f'***Você tem 0 coins!***')
+    else:
+        await ctx.send(f'Foram retiradas {amount} coins à sua carteira.')
+        
+        
+        
+@client.command()
+async def pix(ctx, member: discord.Member, amount: int):
+    member_id = str(member.id)
+    author_id = str(ctx.author.id)
+    with open(wallet_file, 'r') as f:
+        wallets = json.load(f)
+
+    if member_id not in wallets:
+        await ctx.send('Você ainda não possui carteira registrada. Use o comando +newwallet para criar uma.')
+        return
+
+    balance_author = wallets[author_id]['balance']
+    
+    if amount <= balance_author:
+        wallets[author_id]['balance'] -= amount
+        wallets[author_id]["transactions"].append({'type': 'ExitMoney', 'amount': amount, 'payer': member_id})
+        
+        wallets[member_id]['balance'] += amount
+        wallets[member_id]["transactions"].append({'type': 'JoinMoney', 'amount': amount, 'receiver': author_id})
+        
+        with open(wallet_file, 'w') as f:
+            json.dump(wallets, f, indent=4)  
+            
+        embed = discord.Embed(title='PIX REALIZADO! 🟢', description=f'***{ctx.author} fez um pix para {member} no valor de {amount}***', color=discord.Color.orange())
+        msg = await ctx.send(embed=embed)
+        await msg.add_reaction('⬆️')
+        await msg.add_reaction('💸')
+        await msg.add_reaction('⬇️')
+    else: 
+        await ctx.send(f'***Saldo insuficiente!\n{ctx.author} tem {balance_author}***')
+
+
+
+
+
 
 
 @client.command()

@@ -4,7 +4,9 @@ import os
 from key import *
 import random
 from time import sleep
+import json
 
+wallet_file = os.path.join(os.path.dirname(__file__), 'wallet.json')
 
 TOKEN = seu_token()
 msg_id = None
@@ -68,7 +70,7 @@ async def devtest(ctx):
 
 
 @client.command() #dar cargo
-async def Acargo(ctx, member: discord.Member, role_name: str):
+async def addrule(ctx, member: discord.Member, role_name: str):
     """
     Dá um cargo para um membro
     """
@@ -106,7 +108,7 @@ async def Acargo(ctx, member: discord.Member, role_name: str):
         
 
 @client.command() #retirar cargo
-async def Rcargo(ctx, member: discord.Member, role_name: str):
+async def removerule(ctx, member: discord.Member, role_name: str):
     # Verifica se o autor tem permissões de gerenciar cargos
     if ctx.author.guild_permissions.manage_roles:
         # Obtém o objeto de cargo com base no nome fornecido
@@ -151,7 +153,7 @@ async def Rcargo(ctx, member: discord.Member, role_name: str):
 
 @client.command() #criar cargo
 @commands.has_permissions(manage_roles=True)
-async def Ncargo(ctx, cargo_nome: str):
+async def createrule(ctx, cargo_nome: str):
     guild = ctx.guild
 
     # Verificar se o cargo já existe
@@ -192,7 +194,7 @@ async def Ncargo(ctx, cargo_nome: str):
 
         
 @client.command() #criar cargo MOD
-async def Mcargo(ctx, cargo_nome: str):
+async def modrule(ctx, cargo_nome: str):
     # Verifica se o autor tem permissões de administrador
     if ctx.author.guild_permissions.administrator:
         # Cria o cargo com as permissões de moderadores
@@ -225,7 +227,7 @@ async def Mcargo(ctx, cargo_nome: str):
         
         
 @client.command() #deletar cargo
-async def Dcargo(ctx, cargo_nome: str):
+async def deleterule(ctx, cargo_nome: str):
     # Verifica se o autor tem permissões de administrador
     if ctx.author.guild_permissions.administrator:
         # Busca o cargo pelo nome
@@ -259,14 +261,84 @@ async def Dcargo(ctx, cargo_nome: str):
 
         
 @client.command(aliases=['c']) #limpar chat
-async def clear(ctx,amount=100):
-    if ctx.author.guild_permissions.ban_members:
+async def clear(ctx, amount=100):
+    if not ctx.guild:
+        await ctx.send("Este comando só pode ser usado em um servidor.")
+        return
+    member = ctx.author
+    if isinstance(member, discord.User):
+        member = ctx.guild.get_member(member.id)
+    if member.guild_permissions.ban_members:
         await ctx.channel.purge(limit=amount)
-        await ctx.send('**As 100 últimas mensagens foram apagadas com sucesso!**',delete_after=5)
+        await ctx.send('**As 100 últimas mensagens foram apagadas com sucesso!**', delete_after=5)
     else:
         falta = 'Você não tem permissão para usar esse comando!'
         embed = discord.Embed(title=f"{falta}")
         await ctx.send(embed=embed)
+
+
+
+def new_wallet(member_id):
+    if not os.path.exists(wallet_file):
+        with open(wallet_file, 'w') as f:
+            json.dump({}, f)
+    
+    with open(wallet_file, 'r+') as f:
+        wallets = json.load(f)
+        if member_id in wallets:
+            return 'Você já possui uma carteira registrada!'
+        else:
+            wallets[member_id] = {"balance": 0, "transactions": []}
+            f.seek(0)
+            json.dump(wallets, f, indent=4)
+            f.truncate()
+            return 'Sua carteira foi criada com sucesso!'
+
+async def show_balance(ctx, member_id):
+    with open(wallet_file, 'r') as f:
+        wallets = json.load(f)
+
+    if member_id not in wallets:
+        return 'Você ainda não possui carteira registrada. Use o comando +newwallet para criar uma.'
+    else:
+        balance = wallets[member_id]['balance']
+        return f'Seu saldo atual é de {balance} coins 🪙'
+
+
+
+@client.command()
+async def newwallet(ctx):
+    member_id = str(ctx.author.id)
+    message = new_wallet(member_id)
+    await ctx.send(message)
+    
+@client.command()
+async def wallet(ctx):
+    member_id = str(ctx.author.id)
+    message = await show_balance(ctx, member_id)
+    if 'Erro' in message:
+        await ctx.author.send(embed=discord.Embed(title='Erro', description=message))
+    else:
+        embed = discord.Embed(title='Saldo', description=message)
+        msg = await ctx.author.send(embed=embed)
+        await msg.add_reaction('🤑')
+
+@client.command()
+async def addcoins(ctx, amount: int):
+    member_id = str(ctx.author.id)
+    with open(wallet_file, 'r') as f:
+        wallets = json.load(f)
+
+    if member_id not in wallets:
+        await ctx.send('Você ainda não possui carteira registrada. Use o comando +newwallet para criar uma.')
+        return
+
+    wallets[member_id]['balance'] += amount
+
+    with open(wallet_file, 'w') as f:
+        json.dump(wallets, f)
+
+    await ctx.send(f'Foram adicionadas {amount} coins à sua carteira.')
 
 
 @client.command()

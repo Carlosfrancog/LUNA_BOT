@@ -1,6 +1,5 @@
 import discord
 from discord.ext import commands
-from discord import Intents
 from discord.utils import get
 import os
 from key import *
@@ -8,8 +7,6 @@ import random
 import datetime
 from time import sleep
 import json
-import wavelink
-
 
 wallet_file = os.path.join(os.path.dirname(__file__), 'wallet.json')
 
@@ -18,7 +15,7 @@ msg_id = None
 msg_user = None
 
 
-intents = discord.Intents.all()
+intents = discord.Intents.default()
 intents.guilds = True
 intents.messages = True
 intents.message_content = True
@@ -32,7 +29,6 @@ intents.voice_states = True
 intents.presences = True
 intents.reactions = True
 intents.typing = True
-client = discord.Client(intents=intents)
 
 
 client = commands.Bot(command_prefix="+", case_insensitive = True, intents=intents)
@@ -47,11 +43,6 @@ async def on_ready():
             await client.change_presence(activity=discord.Game(name='RPG e pronta para ajudar!😘'))
     except Exception as e:
         print(f'Erro ao iniciar o BOT: {e}')
-        
-    # Configura a biblioteca Wavelink
-    async with client.session.create_client('localhost', 2333, 'youshallnotpass') as wavelink_client:
-        client.wavelink = wavelink_client
-        await client.wavelink.initiate()
 
     
 #FUNÇÕES AXILIARES DOS COMANODOS #######################################   
@@ -137,24 +128,6 @@ def get_rank_position(users, user_id):
             return i + 1
     return None
 
-def get_guild_vc(guild):
-    return next((vc for vc in guild.voice_channels if vc and vc.members), None)
-
-async def on_voice_state_update(member, before, after):
-    guild = member.guild
-    vc = get_guild_vc(guild)
-    if not vc:
-        return
-
-    if not guild.me.voice:
-        await vc.connect()
-        return
-
-    if not member.bot and member == guild.me and before.channel and not after.channel and not vc.members:
-        await guild.voice_client.disconnect()
-
-client = discord.Client()
-client.music = {}
 
 #COMANDOS ##############################################################
 
@@ -632,52 +605,6 @@ async def adminview(ctx, user: discord.Member):
 
     await ctx.author.send(embed=embed)
 
-
-@client.command()
-async def play(ctx, url: str):
-    """Reproduz música de um vídeo do YouTube na call de voz do autor da mensagem"""
-
-    # Verifica se o membro que usou o comando está em uma call de voz
-    if not ctx.author.voice:
-        await ctx.send("Você precisa estar em uma call de voz para usar este comando!")
-        return
-
-    # Verifica se o bot já está em uma call de voz
-    vc = ctx.voice_client
-    if vc:
-        # Verifica se o bot está na mesma call de voz do autor da mensagem
-        if ctx.author.voice.channel != vc.channel:
-            await ctx.send(f"{client.user.name} está tocando música em outro lugar, tente mais tarde!")
-            return
-    else:
-        # Conecta o bot na call de voz do autor da mensagem
-        vc = await ctx.author.voice.channel.connect()
-
-    # Extrai informações do vídeo do YouTube
-    async with client.wavelink.node().get_tracks(f'ytsearch:{url}') as tracks:
-        if not tracks:
-            await ctx.send('Nenhum resultado encontrado!')
-            return
-
-        # Seleciona a primeira música da lista de resultados
-        track = tracks[0]
-
-        # Cria um player para a música
-        if not client.music.get(ctx.guild.id):
-            player = await client.wavelink.get_player(ctx.guild.id)
-            client.music[ctx.guild.id] = player
-        else:
-            player = client.music[ctx.guild.id]
-
-        # Conecta o player na call de voz
-        if not player.is_connected:
-            await player.connect(vc.id)
-
-        # Adiciona a música na fila de reprodução
-        await player.play(track)
-
-        # Envia uma mensagem informando que a música começou a tocar
-        await ctx.send(f"Tocando agora: {track.title}")
         
 ## SISTEMA DA LOJA ####################################################################
 

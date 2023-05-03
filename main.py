@@ -1,11 +1,15 @@
 import discord
 from discord.ext import commands
+from discord import Intents
+from discord.utils import get
 import os
 from key import *
 import random
 import datetime
 from time import sleep
 import json
+import wavelink
+
 
 wallet_file = os.path.join(os.path.dirname(__file__), 'wallet.json')
 
@@ -14,7 +18,7 @@ msg_id = None
 msg_user = None
 
 
-intents = discord.Intents.default()
+intents = discord.Intents.all()
 intents.guilds = True
 intents.messages = True
 intents.message_content = True
@@ -28,6 +32,7 @@ intents.voice_states = True
 intents.presences = True
 intents.reactions = True
 intents.typing = True
+client = discord.Client(intents=intents)
 
 
 client = commands.Bot(command_prefix="+", case_insensitive = True, intents=intents)
@@ -42,6 +47,11 @@ async def on_ready():
             await client.change_presence(activity=discord.Game(name='RPG e pronta para ajudar!😘'))
     except Exception as e:
         print(f'Erro ao iniciar o BOT: {e}')
+        
+    # Configura a biblioteca Wavelink
+    async with client.session.create_client('localhost', 2333, 'youshallnotpass') as wavelink_client:
+        client.wavelink = wavelink_client
+        await client.wavelink.initiate()
 
     
 #FUNÇÕES AXILIARES DOS COMANODOS #######################################   
@@ -119,6 +129,32 @@ def load_data(file_name):
 def save_data(data, file_name):
     with open(os.path.abspath(file_name), "w") as f:
         json.dump(data, f, indent=4)
+
+def get_rank_position(users, user_id):
+    sorted_users = sorted(users.items(), key=lambda x: x[1]["balance"], reverse=True)
+    for i, (id_, data) in enumerate(sorted_users):
+        if id_ == str(user_id):
+            return i + 1
+    return None
+
+def get_guild_vc(guild):
+    return next((vc for vc in guild.voice_channels if vc and vc.members), None)
+
+async def on_voice_state_update(member, before, after):
+    guild = member.guild
+    vc = get_guild_vc(guild)
+    if not vc:
+        return
+
+    if not guild.me.voice:
+        await vc.connect()
+        return
+
+    if not member.bot and member == guild.me and before.channel and not after.channel and not vc.members:
+        await guild.voice_client.disconnect()
+
+client = discord.Client()
+client.music = {}
 
 #COMANDOS ##############################################################
 
@@ -520,7 +556,129 @@ async def oi(ctx):
         await ctx.send(f'**{Escolha}**')
 
 
+@client.command()
+async def bag(ctx):
+    # Load bags and items from JSON files
+    bags = load_data("bags.json")
+    with open('itens.json', 'r', encoding='UTF-8-sig') as f:
+        itens = json.load(f)
 
+    # Find the user's bag and items
+    user_id = str(ctx.author.id)
+    user_bag = bags.get(user_id, {"name": str(ctx.author), "items": {}})
+    user_items = user_bag["items"]
+
+    # Create an embed with the user's bag information
+    embed = discord.Embed(title=f"Bag de {user_bag['name']}", color=0x00ff00)
+    raridades = ["C", "R", "SR", "SSR", "L", "U"]
+    for raridade in raridades:
+        item_fields = []
+        for item in itens:
+            if item["nome"] in user_items and item["raridade"] == raridade:
+                item_fields.append((item["nome"], user_items[item["nome"]]))
+        if item_fields:
+            embed.add_field(name=raridade, value="\n".join([f"{name}: {quantity}" for name, quantity in item_fields]), inline=False)
+
+    # Send the embed to the user
+    await ctx.author.send(embed=embed)
+
+
+@client.command()
+async def adminview(ctx, user: discord.Member):
+    # Verifica se quem executou o comando tem permissão para usá-lo
+    if ctx.author.id != 1079311318273765436:
+        await ctx.send("Você não tem permissão para usar esse comando.")
+        return
+
+    # Obtém os dados do usuário
+    wallets = load_data("wallet.json")
+    bags = load_data("bags.json")
+    with open('itens.json', 'r', encoding='UTF-8-sig') as f:
+        itens = json.load(f)
+    transactions = load_data("transactions.json")
+
+    wallet = wallets.get(str(user.id), {"balance": 0})
+    bag = bags.get(str(user.id), {"items": {}})
+    user_transactions = [t for t in transactions if t["user_id"] == str(user.id)]
+    sorted_users = dict(sorted(wallets.items(), key=lambda item: item[1]["balance"], reverse=True))
+    position = get_rank_position(sorted_users, user.id)
+    user_roles = "".join([f"NOME:{r.name}\n ID:({r.id})\n" for r in user.roles if r.name != "@everyone"]) if isinstance(user, discord.Member) else "Usuário não está com cargos"
+
+
+    # Cria a mensagem do embed
+    embed = discord.Embed(title=f"Informações do usuário {user.name}", color=0x00ff00)
+    embed.set_thumbnail(url=user.avatar.url)  # Adiciona a foto de perfil do membro
+    embed.add_field(name="Dinheiro", value=f"{wallet['balance']} moedas", inline=False)
+
+    # Adiciona a lista de itens do usuário dividido por raridade
+    raridades = {}
+    for item in bag["items"]:
+        raridade = next((i["raridade"] for i in itens if i["nome"] == item), None)
+        if raridade not in raridades:
+            raridades[raridade] = []
+        raridades[raridade].append(f"{item} x {bag['items'][item]}")
+    for raridade, items in raridades.items():
+        embed.add_field(name=f"{raridade.capitalize()} ({len(items)})", value="\n".join(items), inline=False)
+
+    embed.add_field(name="Posição no Rank", value=f"{position}", inline=False)
+    embed.add_field(name="Cargos", value=user_roles, inline=False)
+
+    # Adiciona a lista de transações do usuário
+    if user_transactions:
+        transactions_str = []
+        for t in user_transactions:
+            transactions_str.append(f"{t['date']}: {t['description']} ({t['amount']} moedas)")
+        embed.add_field(name="Transações", value="\n".join(transactions_str), inline=False)
+
+    await ctx.author.send(embed=embed)
+
+
+@client.command()
+async def play(ctx, url: str):
+    """Reproduz música de um vídeo do YouTube na call de voz do autor da mensagem"""
+
+    # Verifica se o membro que usou o comando está em uma call de voz
+    if not ctx.author.voice:
+        await ctx.send("Você precisa estar em uma call de voz para usar este comando!")
+        return
+
+    # Verifica se o bot já está em uma call de voz
+    vc = ctx.voice_client
+    if vc:
+        # Verifica se o bot está na mesma call de voz do autor da mensagem
+        if ctx.author.voice.channel != vc.channel:
+            await ctx.send(f"{client.user.name} está tocando música em outro lugar, tente mais tarde!")
+            return
+    else:
+        # Conecta o bot na call de voz do autor da mensagem
+        vc = await ctx.author.voice.channel.connect()
+
+    # Extrai informações do vídeo do YouTube
+    async with client.wavelink.node().get_tracks(f'ytsearch:{url}') as tracks:
+        if not tracks:
+            await ctx.send('Nenhum resultado encontrado!')
+            return
+
+        # Seleciona a primeira música da lista de resultados
+        track = tracks[0]
+
+        # Cria um player para a música
+        if not client.music.get(ctx.guild.id):
+            player = await client.wavelink.get_player(ctx.guild.id)
+            client.music[ctx.guild.id] = player
+        else:
+            player = client.music[ctx.guild.id]
+
+        # Conecta o player na call de voz
+        if not player.is_connected:
+            await player.connect(vc.id)
+
+        # Adiciona a música na fila de reprodução
+        await player.play(track)
+
+        # Envia uma mensagem informando que a música começou a tocar
+        await ctx.send(f"Tocando agora: {track.title}")
+        
 ## SISTEMA DA LOJA ####################################################################
 
 @client.command()
@@ -576,7 +734,23 @@ async def mostrar_pagina(itens, pagina_atual):
     return embed
 
 @client.command()
-async def infoitem(ctx, item_name):
+async def info(ctx, item_name):
+    with open('itens.json', 'r', encoding='UTF-8-sig') as f:
+        itens = json.load(f)
+    for item in itens:
+        if item['nome'].lower() == item_name.lower():
+            quantidade = item["quantidade"]
+            if quantidade == 0:
+                response = f"Item: {item['nome']}\nRaridade: {item['raridade']}\nPreço: {item['preco']} moedas\nQuantidade disponível: ESGOTADO"
+            else:
+                response = f"Item: {item['nome']}\nRaridade: {item['raridade']}\nPreço: {item['preco']} moedas\nQuantidade disponível: {quantidade}"
+            
+            # Criação do embed
+            embed = discord.Embed(title="Informações do Item", description=response, color=0xff0000)
+            embed.set_thumbnail(url="https://exemplo.com/imagem.png")
+            await ctx.send(embed=embed)
+            return
+    await ctx.send("Item não encontrado.")
     with open('itens.json', 'r', encoding='UTF-8-sig') as f:
         itens = json.load(f)
     for item in itens:
@@ -591,7 +765,7 @@ async def infoitem(ctx, item_name):
     await ctx.send("Item não encontrado.")
 
 @client.command()
-async def buyitem(ctx, *args):
+async def buy(ctx, *args):
     arg_str = ' '.join(args)
     item_name, quantity = arg_str.split()
     quantity = quantity.strip()
@@ -608,7 +782,6 @@ async def buyitem(ctx, *args):
     with open('itens.json', 'r', encoding='UTF-8-sig') as f:
         itens = json.load(f)
 
-
     # Find the item the user wants to buy
     item = next((i for i in itens if i["nome"].lower() == item_name.lower()), None)
     if not item:
@@ -619,15 +792,13 @@ async def buyitem(ctx, *args):
     if item["quantidade"] == 0:
         await ctx.send(f"Desculpe, mas o item {item['nome']} está esgotado no momento.")
         return
-    
+
     # convert quantity to int
     item["quantidade"] = int(item["quantidade"])
-    
-    
+
     if item["quantidade"] < quantity:
         await ctx.send(f"Desculpe, mas só temos {item['quantidade']} unidades do item {item['nome']} disponíveis.")
         return
-
 
     # Check if the user has enough money
     price = item["preco"] * quantity
@@ -655,8 +826,10 @@ async def buyitem(ctx, *args):
     save_data(bags, "bags.json")
     with open('itens.json', 'w', encoding='UTF-8-sig') as f:
         json.dump(itens, f, indent=4)
-    await ctx.send(f"{ctx.author.mention}, você comprou {quantity} unidades do item {item['nome']} por {price} reais. Obrigado pela compra!")
 
+    # create the embed
+    embed = discord.Embed(title="Compra Realizada", description=f"{ctx.author.mention} comprou {quantity} unidades do item {item['nome']} por {price} coins. Obrigado pela compra!", color=0x00ff00)
+    await ctx.send(embed=embed)
 
 
 ########################################################################################

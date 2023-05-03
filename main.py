@@ -569,12 +569,11 @@ async def mostrar_pagina(itens, pagina_atual):
         nome = item["nome"]
         preco = item["preco"]
         quantidade = item["quantidade"]
-        if quantidade == "ESGOTADO":
+        if quantidade == 0:
             embed.add_field(name=nome, value=f"{preco} moedas - ESGOTADO", inline=False)
         else:
             embed.add_field(name=nome, value=f"{preco} moedas - {quantidade} unidades", inline=False)
     return embed
-
 
 @client.command()
 async def infoitem(ctx, item_name):
@@ -592,21 +591,23 @@ async def infoitem(ctx, item_name):
     await ctx.send("Item não encontrado.")
 
 @client.command()
-async def buyitem(ctx, arg):
-    args = arg.split(',')
-    if len(args) != 2:
-        await ctx.send("Formato do comando inválido. Use o formato `+buyitem nome_do_item, quantidade`.")
-        return
-    item_name, quantity = args
+async def buyitem(ctx, *args):
+    arg_str = ' '.join(args)
+    item_name, quantity = arg_str.split()
     quantity = quantity.strip()
-    if not quantity:
-        await ctx.send("Quantidade inválida. Use o formato `+buyitem nome_do_item, quantidade`.")
+
+    if not quantity.isdigit():
+        await ctx.send("Quantidade inválida. Use o formato `+buyitem nome_do_item quantidade`.")
         return
+
+    quantity = int(quantity)
+
     # Load wallets, bags, and items from JSON files
     wallets = load_data("wallet.json")
     bags = load_data("bags.json")
     with open('itens.json', 'r', encoding='UTF-8-sig') as f:
         itens = json.load(f)
+
 
     # Find the item the user wants to buy
     item = next((i for i in itens if i["nome"].lower() == item_name.lower()), None)
@@ -615,15 +616,21 @@ async def buyitem(ctx, arg):
         return
 
     # Check if the item is available
-    if item["quantidade"] == "ESGOTADO":
+    if item["quantidade"] == 0:
         await ctx.send(f"Desculpe, mas o item {item['nome']} está esgotado no momento.")
         return
-    if not isinstance(item["quantidade"], str) or not item["quantidade"].isdigit() or int(item["quantidade"]) < int(quantity):
+    
+    # convert quantity to int
+    item["quantidade"] = int(item["quantidade"])
+    
+    
+    if item["quantidade"] < quantity:
         await ctx.send(f"Desculpe, mas só temos {item['quantidade']} unidades do item {item['nome']} disponíveis.")
         return
 
+
     # Check if the user has enough money
-    price = item["preco"] * int(quantity)
+    price = item["preco"] * quantity
     wallet = wallets.get(str(ctx.author.id))
     if not wallet:
         await ctx.send("Você não tem dinheiro suficiente!")
@@ -637,11 +644,11 @@ async def buyitem(ctx, arg):
 
     # Add the items to the user's bag
     bag = bags.get(str(ctx.author.id), {"name": str(ctx.author), "items": {}})
-    bag["items"][item["nome"]] = bag["items"].get(item["nome"]) or 0 + int(quantity)
+    bag["items"][item["nome"]] = bag["items"].get(item["nome"]) or 0 + quantity
     bags[str(ctx.author.id)] = bag
     # Decrease the quantity of the item in the store
     item["quantidade"] = int(item["quantidade"])
-    item["quantidade"] -= int(quantity)
+    item["quantidade"] -= quantity
 
     # Save the updated wallets, bags, and items to JSON files
     save_data(wallets, "wallet.json")

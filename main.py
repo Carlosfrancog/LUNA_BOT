@@ -374,7 +374,7 @@ async def clear(ctx, amount=100):
         member = ctx.guild.get_member(member.id)
     if member.guild_permissions.ban_members:
         await ctx.channel.purge(limit=amount)
-        await ctx.send('**As 100 últimas mensagens foram apagadas com sucesso!**', delete_after=5)
+        await ctx.send(f'**As {amount} últimas mensagens foram apagadas com sucesso!**', delete_after=2)
     else:
         falta = 'Você não tem permissão para usar esse comando!'
         embed = discord.Embed(title=f"{falta}")
@@ -416,16 +416,16 @@ async def wallet(ctx):
 
 
 @client.command()
-async def addcoins(ctx, amount: int):
+async def addcoins(ctx, member: discord.Member, amount: int):
     '''
     Adiciona coins
     '''
-    member_id = str(ctx.author.id)
+    member_id = str(member.id)
     with open(wallet_file, 'r') as f:
         wallets = json.load(f)
 
     if member_id not in wallets:
-        await ctx.send('Você ainda não possui carteira registrada. Use o comando +newwallet para criar uma.')
+        await ctx.send('Este membro ainda não possui uma carteira registrada. Use o comando +newwallet para criar uma.')
         return
 
     wallets[member_id]['balance'] += amount
@@ -433,20 +433,25 @@ async def addcoins(ctx, amount: int):
     with open(wallet_file, 'w') as f:
         json.dump(wallets, f, indent=4)
 
-    await ctx.send(f'Foram adicionadas {amount} coins à sua carteira.')
+    embed = discord.Embed(title='Coins adicionadas!',
+                          description=f'{amount} coins foram adicionadas à carteira de {member.mention}!',
+                          color=discord.Color.green())
+    embed.set_image(url='https://media.giphy.com/media/YnBntKOgnUSBkV7bQH/giphy.gif')
+    embed.set_thumbnail(url=member.avatar.url)
+    await ctx.send(embed=embed)
 
 
 @client.command()
-async def removecoins(ctx, amount: int):
+async def removecoins(ctx, member: discord.Member, amount: int):
     '''
     Remove coins
     '''
-    member_id = str(ctx.author.id)
+    member_id = str(member.id)
     with open(wallet_file, 'r') as f:
         wallets = json.load(f)
 
     if member_id not in wallets:
-        await ctx.send('Você ainda não possui carteira registrada. Use o comando +newwallet para criar uma.')
+        await ctx.send('Este membro ainda não possui uma carteira registrada. Use o comando +newwallet para criar uma.')
         return
 
     if amount >= wallets[member_id]['balance'] :
@@ -458,9 +463,19 @@ async def removecoins(ctx, amount: int):
         json.dump(wallets, f, indent=4)
 
     if wallets[member_id]['balance'] == 0:
-        await ctx.send(f'***Você tem 0 coins!***')
+        embed = discord.Embed(title='Coins removidas!',
+                              description=f'Infelizmente, todas as suas coins foram retiradas, {member.mention}... :disappointed_relieved:',
+                              color=discord.Color.red())
+        embed.set_image(url='https://media.giphy.com/media/BEob5qwFkSJ7G/giphy.gif')
+        embed.set_thumbnail(url=member.avatar.url)
+        await ctx.send(embed=embed)
     else:
-        await ctx.send(f'Foram retiradas {amount} coins à sua carteira.')
+        embed = discord.Embed(title='Coins removidas!',
+                              description=f'{amount} coins foram retiradas da carteira de {member.mention}...',
+                              color=discord.Color.red())
+        embed.set_image(url='https://media.giphy.com/media/BEob5qwFkSJ7G/giphy.gif')
+        embed.set_thumbnail(url=member.avatar.url)
+        await ctx.send(embed=embed)
         
           
 @client.command()
@@ -520,16 +535,6 @@ async def salary(ctx):
 
 
 @client.command()
-async def oi(ctx):
-        RespOi = ['Olá!', 'Como vai?', 'Prazer, sou a Luna', 'Oi', 'Não me atrapalha peste!']
-        list = RespOi
-        Escolha = random.choice(list)
-        print(Escolha)
-    
-        await ctx.send(f'**{Escolha}**')
-
-
-@client.command()
 async def bag(ctx):
     # Load bags and items from JSON files
     bags = load_data("bags.json")
@@ -543,6 +548,8 @@ async def bag(ctx):
 
     # Create an embed with the user's bag information
     embed = discord.Embed(title=f"Bag de {user_bag['name']}", color=0x00ff00)
+    embed.set_thumbnail(url=ctx.author.avatar.url)
+    
     raridades = ["C", "R", "SR", "SSR", "L", "U"]
     for raridade in raridades:
         item_fields = []

@@ -705,7 +705,7 @@ async def buy(ctx, *args):
     quantity = quantity.strip()
 
     if not quantity.isdigit():
-        await ctx.send("Quantidade inválida. Use o formato `+buyitem nome_do_item quantidade`.")
+        await ctx.send("Quantidade inválida. Use o formato `+buy nome_do_item quantidade`.")
         return
 
     quantity = int(quantity)
@@ -733,6 +733,11 @@ async def buy(ctx, *args):
     if item["quantidade"] < quantity:
         await ctx.send(f"Desculpe, mas só temos {item['quantidade']} unidades do item {item['nome']} disponíveis.")
         return
+    
+    # Check if the user has a wallet and enough money
+    if str(ctx.author.id) not in wallets:
+        await ctx.send("Você não tem uma carteira. Use `+newwallet` para criar uma.")
+        return
 
     # Check if the user has enough money
     price = item["preco"] * quantity
@@ -749,7 +754,7 @@ async def buy(ctx, *args):
 
     # Add the items to the user's bag
     bag = bags.get(str(ctx.author.id), {"name": str(ctx.author), "items": {}})
-    bag["items"][item["nome"]] = bag["items"].get(item["nome"]) or 0 + quantity
+    bag["items"][item["nome"]] = bag["items"].get(item["nome"], 0) + quantity
     bags[str(ctx.author.id)] = bag
     # Decrease the quantity of the item in the store
     item["quantidade"] = int(item["quantidade"])

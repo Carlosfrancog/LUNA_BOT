@@ -1,0 +1,67 @@
+{
+    "489241159756021761": {
+        "user_name": "CADU",
+        "balance": 9999999999550,
+        "transactions": [
+            {
+                "type": "JoinMoney",
+                "amount": 500,
+                "receiver": "1079311318273765436"
+            }
+        ]
+    },
+    "1100271789403295765": {
+        "user_name": "LUNA",
+        "balance": 500,
+        "transactions": []
+    },
+    "721085216491307129": {
+        "user_name": "Carraro \u611b",
+        "balance": 0,
+        "transactions": [
+            {
+                "type": "JoinMoney",
+                "amount": 5000,
+                "receiver": "1079311318273765436"
+            },
+            {
+                "type": "JoinMoney",
+                "amount": 7777777,
+                "receiver": "1079311318273765436"
+            },
+            {
+                "type": "ExitMoney",
+                "amount": 100,
+                "payer": "1079311318273765436"
+            },
+            {
+                "type": "JoinMoney",
+                "amount": 10000000000,
+                "receiver": "1079311318273765436"
+            }
+        ],
+        "last_salary_date": "2023-10-31T20:31:45.663196"
+    },
+    "1079311318273765436": {
+        "user_name": "LEON",
+        "balance": 99999999999989992217522,
+        "transactions": [
+            {
+                "type": "ExitMoney",
+                "amount": 7777777,
+                "payer": "721085216491307129"
+            },
+            {
+                "type": "JoinMoney",
+                "amount": 100,
+                "receiver": "721085216491307129"
+            },
+            {
+                "type": "ExitMoney",
+                "amount": 10000000000,
+                "payer": "721085216491307129"
+            }
+        ],
+        "last_salary_date": "2023-05-09T00:45:48.244758"
+    }
+}

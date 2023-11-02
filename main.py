@@ -7,10 +7,7 @@ import time
 import datetime
 from time import sleep
 import json
-import asyncio
-import requests
-import random
-from key import *
+from secret import *
 
 intents = discord.Intents.default()
 intents.guilds = True
@@ -29,7 +26,8 @@ intents.typing = True
 
 wallet_file = os.path.join(os.path.dirname(__file__), 'wallet.json')
 
-TOKEN = seu_token()
+TOKEN = Discord_token()
+openai.api_key = OpenaiKey()
 msg_id = None
 msg_user = None
 
@@ -129,6 +127,43 @@ def get_rank_position(users, user_id):
         if id_ == str(user_id):
             return i + 1
     return None
+
+def generate_response(input_text, max_tokens=50):
+    response = openai.Completion.create(
+        engine="davinci",
+        prompt=input_text,
+        max_tokens=max_tokens
+    )
+    return response.choices[0].text
+
+async def send_response(ctx, response):
+    embed = discord.Embed(
+        title='Resposta obtida:',
+        description=response,
+        color=0x7289da
+    )
+    
+    embed.set_image(url="gpt.jpeg")
+    
+    buttons = [
+        {
+            "label": "Sim",
+            "style": 3,
+            "custom_id": "satisfactory_yes"
+        },
+        {
+            "label": "Não",
+            "style": 4,
+            "custom_id": "satisfactory_no"
+        }   
+    ]
+    
+    action_row = {
+        "type": 1,
+        "components": buttons
+    }
+    
+    await ctx.send(embed=embed, components=[action_row])
 
 
 #COMANDOS ##############################################################
@@ -777,6 +812,21 @@ async def buy(ctx, *args):
     await ctx.send(embed=embed)
 
 
+@client.command()
+async def gpt(ctx, *, input_text):
+    response =  generate_response(input_text)
+    await send_response(ctx, response)
+    
+@client.event
+async def on_button_click(ctx):
+    if ctx.component.custom_id == "satisfactory_yes":
+        await ctx.respond(
+            content="Ótimo! Se precisar de mais informações, é só perguntar."
+        )
+    elif ctx.component.custom_id =="satisfactory_no":
+        input_text = ctx.message.embeds[0].description
+        response = generate_response(input_text, max_tokens=800)
+        
 ########################################################################################
 
 

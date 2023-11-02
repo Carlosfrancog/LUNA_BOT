@@ -1,35 +1,11 @@
-import discord
-from discord.ext import commands
-from discord.utils import get
-import os
+from requirements import *
 from key import *
-import random
-import datetime
-from time import sleep
-import json
 
 wallet_file = os.path.join(os.path.dirname(__file__), 'wallet.json')
 
 TOKEN = seu_token()
 msg_id = None
 msg_user = None
-
-
-intents = discord.Intents.default()
-intents.guilds = True
-intents.messages = True
-intents.message_content = True
-intents.members = True
-intents.bans = True
-intents.emojis = True
-intents.integrations = True
-intents.webhooks = True
-intents.invites = True
-intents.voice_states = True
-intents.presences = True
-intents.reactions = True
-intents.typing = True
-
 
 client = commands.Bot(command_prefix="+", case_insensitive = True, intents=intents)
 #client.remove_command('help')
@@ -381,7 +357,7 @@ async def clear(ctx, amount=100):
         await ctx.send(embed=embed)
 
 
-@client.command()
+@client.command() #mostra rank
 async def rank(ctx):
     '''
     Exibe o ranking das pessoas mais ricas do servidor.
@@ -389,7 +365,7 @@ async def rank(ctx):
     await show_rank(ctx)
 
 
-@client.command()
+@client.command() #cariar carteira
 async def newwallet(ctx):
     '''
     Cria uma nova carteira
@@ -400,7 +376,7 @@ async def newwallet(ctx):
     await ctx.send(message)
 
     
-@client.command()
+@client.command() #ver carteira
 async def wallet(ctx):
     '''
     Vizualiza a carteira
@@ -415,7 +391,7 @@ async def wallet(ctx):
         await msg.add_reaction('🤑')
 
 
-@client.command()
+@client.command() #adcionar coins (retirar esse comando)
 async def addcoins(ctx, member: discord.Member, amount: int):
     '''
     Adiciona coins
@@ -441,7 +417,7 @@ async def addcoins(ctx, member: discord.Member, amount: int):
     await ctx.send(embed=embed)
 
 
-@client.command()
+@client.command() #remover coins (retirar esse comando)
 async def removecoins(ctx, member: discord.Member, amount: int):
     '''
     Remove coins
@@ -478,7 +454,7 @@ async def removecoins(ctx, member: discord.Member, amount: int):
         await ctx.send(embed=embed)
         
           
-@client.command()
+@client.command() #transferir coins
 async def pix(ctx, member: discord.Member, amount: int):
     '''
     Tranfere dinheiro para outra pessoa
@@ -513,7 +489,7 @@ async def pix(ctx, member: discord.Member, amount: int):
         await ctx.send(f'***Saldo insuficiente!\n{ctx.author} tem {balance_author}***')
 
 
-@client.command()
+@client.command() #resgastar salario
 async def salary(ctx):
     member_id = str(ctx.author.id)
     last_salary_date = get_last_salary_date(member_id)
@@ -534,7 +510,7 @@ async def salary(ctx):
         await ctx.send(f'***Você já recebeu seu salário diario hoje! Tente novamente em {(datetime.datetime.fromisoformat(last_salary_date) + datetime.timedelta(days=1)).strftime("%d/%m/%Y às %H:%M:%S")}.***')
 
 
-@client.command()
+@client.command() #mostrar a bolça
 async def bag(ctx):
     # Load bags and items from JSON files
     bags = load_data("bags.json")
@@ -563,7 +539,7 @@ async def bag(ctx):
     await ctx.author.send(embed=embed)
 
 
-@client.command()
+@client.command() # visão geral sobre algum menbro
 async def adminview(ctx, user: discord.Member):
     # Verifica se quem executou o comando tem permissão para usá-lo
     if ctx.author.id != 1079311318273765436:
@@ -612,10 +588,14 @@ async def adminview(ctx, user: discord.Member):
 
     await ctx.author.send(embed=embed)
 
-        
+
+@client.command() #teste coamand
+async def oi(ctx):
+    await ctx.send(f'Olá {ctx.author}!')
+
 ## SISTEMA DA LOJA ####################################################################
 
-@client.command()
+@client.command() #mostarar a loja
 async def store(ctx):
     with open('itens.json', 'r', encoding='UTF-8-sig') as f:
         itens = json.load(f)
@@ -667,7 +647,7 @@ async def mostrar_pagina(itens, pagina_atual):
             embed.add_field(name=nome, value=f"{preco} moedas - {quantidade} unidades", inline=False)
     return embed
 
-@client.command()
+@client.command() #informação de um item
 async def info(ctx, item_name):
     with open('itens.json', 'r', encoding='UTF-8-sig') as f:
         itens = json.load(f)
@@ -698,7 +678,7 @@ async def info(ctx, item_name):
             return
     await ctx.send("Item não encontrado.")
 
-@client.command()
+@client.command() #comprar o item
 async def buy(ctx, *args):
     arg_str = ' '.join(args)
     item_name, quantity = arg_str.split()
